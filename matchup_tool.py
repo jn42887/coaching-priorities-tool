@@ -169,6 +169,10 @@ st.dataframe(styled_df, use_container_width=True)
 label_to_stat = {v: k for k, v in readable_labels.items()}
 readable_options = list(label_to_stat.keys())
 
+# Make sure the session state is initialized before using it
+if "selected_stat" not in st.session_state:
+    st.session_state["selected_stat"] = readable_options[0]
+
 selected_label = st.selectbox(
     "Select a stat to view team performance tiers",
     readable_options,
