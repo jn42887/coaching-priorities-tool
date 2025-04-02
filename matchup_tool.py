@@ -154,30 +154,18 @@ else:
     scaled = [1] * len(matchup_series)
 
 # Determine the direction of impact from original importance_df
-impact_sign = importance_df.loc[team].apply(lambda x: "Positive" if x > 0 else "Negative")
-
 matchup_df = pd.DataFrame({
     "Variable": matchup_series.index.map(readable_labels),
     "Matchup Priority Score": scaled.round(0).astype(int),
-    "Impact Direction": matchup_series.index.map(impact_sign)
 }).sort_values(by="Matchup Priority Score", ascending=False).reset_index(drop=True)
 
 # Add rank column from 1 to 8
 matchup_df.index += 1
 matchup_df.index.name = "Rank"
 
-# Styled DataFrame for color gradient
-def color_impact(val):
-    if val == "Positive":
-        return "color: green"
-    elif val == "Negative":
-        return "color: red"
-    return ""
 
 styled_df = matchup_df.style\
-    .background_gradient(cmap="Greens", subset=["Matchup Priority Score"])\
-    .applymap(color_impact, subset=["Impact Direction"])
-
+    .background_gradient(cmap="Greens", subset=["Matchup Priority Score"])
 
 st.dataframe(styled_df, use_container_width=True)
 
@@ -233,7 +221,11 @@ def stat_by_tier(df, team, stat):
             return "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1)*(n % 10 < 4)*n % 10::4])
         rank_num = int(rank)
         rank_str = ordinal(rank_num)
-        value_str = f"{avg_val * 100:.1f}%"
+        # Format percentages correctly: don't multiply if already on 0–100 scale
+        if stat in ["oQSQ", "dQSQ"]:
+            value_str = f"{avg_val:.1f}"
+        else:
+            value_str = f"{avg_val * 100:.1f}%"
         records.append({"Game Tier": tier_name, "Value": value_str, "Rank": rank_str})
     return pd.DataFrame(records)
 
