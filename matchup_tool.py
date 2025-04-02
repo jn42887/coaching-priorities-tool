@@ -171,6 +171,7 @@ if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
         "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
         "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
     }
-    subset_teams = subset_map[opponent]
-    with st.expander(f"View teams in {opponent}"):
-    st.markdown(', '.join(subset_teams))
+    subset_teams = subset_map.get(opponent, [])
+    if subset_teams:
+        with st.expander(f"View teams in {opponent}"):
+            st.markdown(', '.join(subset_teams))
