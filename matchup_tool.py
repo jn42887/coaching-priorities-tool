@@ -160,13 +160,4 @@ if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
         with st.expander(f"View teams in {opponent}"):
             st.markdown(', '.join(subset_teams))
 
-# Show which teams are in the selected subset
-if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
-    subset_map = {
-        "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index.tolist(),
-        "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
-        "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
-    }
-    subset_teams = subset_map[opponent]
-    with st.expander(f"View teams in {opponent}"):
-        st.markdown(', '.join(subset_teams))
+
