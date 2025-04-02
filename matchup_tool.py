@@ -148,6 +148,73 @@ styled_df = matchup_df.style.background_gradient(cmap="Greens", subset=["Matchup
 
 st.dataframe(styled_df, use_container_width=True)
 
+# Stat breakdown selector
+selected_stat = st.selectbox("Select a stat to view team performance tiers", list(counterpart_map.keys()))
+stat_counterpart = counterpart_map[selected_stat]
+
+# Function to get team stat averages and ranks by tier
+def stat_by_tier(df, team, stat):
+    team_df = df[df["Team"] == team].dropna(subset=["NETRTG", stat])
+    team_df = team_df.sort_values("NETRTG", ascending=False)
+    n = len(team_df)
+    if n < 3:
+        return pd.DataFrame(columns=["Game Tier", "Value", "Rank"])
+    tiers = {
+        "Best Games": team_df.iloc[:n // 3],
+        "Average Games": team_df.iloc[n // 3:2 * n // 3],
+        "Worst Games": team_df.iloc[2 * n // 3:]
+    }
+    records = []
+    for tier_name, tier_df in tiers.items():
+        avg_val = tier_df[stat].mean()
+        # Get ranks vs other teams in same tier
+        tier_group = []
+        for other_team in df["Team"].unique():
+            group = df[df["Team"] == other_team].sort_values("NETRTG", ascending=False)
+            m = len(group)
+            if m < 3:
+                continue
+            segment = {
+                "Best Games": group.iloc[:m // 3],
+                "Average Games": group.iloc[m // 3:2 * m // 3],
+                "Worst Games": group.iloc[2 * m // 3:]
+            }[tier_name]
+            tier_group.append(segment[stat].mean())
+        rank = pd.Series(tier_group).rank(ascending=False, method="min").loc[len(tier_group)] if tier_group else None
+        def ordinal(n):
+            return "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1)*(n % 10 < 4)*n % 10::4])
+        rank_num = int(...)
+        rank_str = ordinal(rank_num)
+        records.append({"Game Tier": tier_name, "Value": round(avg_val, 2), "Rank": rank_str})
+    return pd.DataFrame(records)
+
+# Show side-by-side tables
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader(f"{team} — {readable_labels.get(selected_stat, selected_stat)}")
+    df_team_stat = stat_by_tier(df, team, selected_stat)
+    st.dataframe(df_team_stat, use_container_width=True)
+
+with col2:
+    if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
+        # use average of all teams in opponent group
+        subset_map = {
+            "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index.tolist(),
+            "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
+            "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
+        }
+        subset_teams = subset_map[opponent]
+        st.subheader(f"{opponent} Avg — {readable_labels.get(stat_counterpart, stat_counterpart)}")
+        avg_df = pd.concat([stat_by_tier(df, opp, stat_counterpart) for opp in subset_teams])
+        tier_means = avg_df.groupby("Game Tier").agg({"Value": "mean"}).reset_index()
+        tier_means["Rank"] = "–"
+        st.dataframe(tier_means, use_container_width=True)
+    else:
+        st.subheader(f"{opponent} — {readable_labels.get(stat_counterpart, stat_counterpart)}")
+        df_opp_stat = stat_by_tier(df, opponent, stat_counterpart)
+        st.dataframe(df_opp_stat, use_container_width=True)
+
 # Show which teams are in the selected subset
 if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
     subset_map = {
@@ -160,4 +227,13 @@ if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
         with st.expander(f"View teams in {opponent}"):
             st.markdown(', '.join(subset_teams))
 
-
+# Show which teams are in the selected subset
+if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
+    subset_map = {
+        "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index.tolist(),
+        "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
+        "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
+    }
+    subset_teams = subset_map[opponent]
+    with st.expander(f"View teams in {opponent}"):
+        st.markdown(', '.join(subset_teams))
