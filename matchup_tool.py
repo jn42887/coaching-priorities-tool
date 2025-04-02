@@ -148,34 +148,40 @@ matchup_df.index.name = "Rank"
 styled_df = matchup_df.style.background_gradient(cmap="Greens", subset=["Matchup Priority Score"])
 st.dataframe(styled_df, use_container_width=True)
 
-# Neutral stat table
+# Scale neutral stats’ importance across teams (absolute value)
+neutral_importance = importance_df[neutral_stats].abs()
+scaler = MinMaxScaler(feature_range=(1, 100))
+scaled_neutral_importance = pd.DataFrame(
+    scaler.fit_transform(neutral_importance),
+    index=neutral_importance.index,
+    columns=neutral_importance.columns
+)
+
+# Build the neutral stat table for the selected team
 neutral_data = []
 for stat in neutral_stats:
-    importance = importance_df.loc[team, stat]
+    imp = scaled_neutral_importance.loc[team, stat]
+    raw_imp = importance_df.loc[team, stat]
     if stat == "AvgOffPace":
-        direction = "Faster" if importance > 0 else "Slower"
+        direction = "Faster" if raw_imp > 0 else "Slower"
         label = "Pace"
     elif stat == "AvgDefPace":
-        direction = "Faster" if importance > 0 else "Slower"
+        direction = "Faster" if raw_imp > 0 else "Slower"
         label = "Opp Pace"
     elif stat == "3PA Rate":
-        direction = "More" if importance > 0 else "Less"
+        direction = "More" if raw_imp > 0 else "Less"
         label = "Threes"
     elif stat == "3PA Rate Allowed":
-        direction = "More" if importance > 0 else "Less"
+        direction = "More" if raw_imp > 0 else "Less"
         label = "Opp Threes"
     else:
         label = readable_labels.get(stat, stat)
-    neutral_data.append({
-        "Category": label,
-        "Better": direction,
-        "Importance": round(abs(importance) * 100)
-    })
+    neutral_data.append({"Category": label, "Better": direction, "Importance": round(imp)})
 
-neutral_df = pd.DataFrame(neutral_data)
-neutral_df = neutral_df.sort_values(by="Importance", ascending=False).reset_index(drop=True)
+neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False).reset_index(drop=True)
 st.subheader("Neutral Stat Tendencies")
-st.dataframe(neutral_df, use_container_width=True)
+styled_neutral_df = neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"])
+st.dataframe(styled_neutral_df, use_container_width=True)
 
 # Stat breakdowns
 label_to_stat = {v: k for k, v in readable_labels.items()}
