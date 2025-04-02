@@ -62,7 +62,10 @@ for team, group in df.groupby("Team"):
     importance_signed[team] = pd.Series(adjusted_coefs)
 
 importance_df = pd.DataFrame(importance_signed).T.fillna(0)
-variance_df = df.groupby("Team")[predictors].var().fillna(0)
+# Only use columns that exist in df
+existing_predictors = [col for col in predictors if col in df.columns]
+variance_df = df.groupby("Team")[existing_predictors].var().fillna(0)
+predictors = existing_predictors
 
 priority_product = importance_df * variance_df
 priority_weighted = 0.7 * importance_df + 0.3 * variance_df
