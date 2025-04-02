@@ -183,7 +183,7 @@ def stat_by_tier(df, team, stat):
         rank = pd.Series(tier_group + [avg_val]).rank(ascending=False, method="min").iloc[-1]
         def ordinal(n):
             return "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1)*(n % 10 < 4)*n % 10::4])
-        rank_num = int(...)
+        rank_num = int(rank)
         rank_str = ordinal(rank_num)
         records.append({"Game Tier": tier_name, "Value": round(avg_val, 2), "Rank": rank_str})
     return pd.DataFrame(records)
