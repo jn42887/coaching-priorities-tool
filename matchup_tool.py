@@ -2,6 +2,9 @@ import pandas as pd
 import streamlit as st
 from sklearn.preprocessing import MinMaxScaler
 
+# At the top of your script (after imports)
+st.set_page_config(page_title="Matchup Priorities", layout="wide")
+
 # Load the Excel file
 file_path = "Four Factors by Team and Game.xlsx"
 df = pd.read_excel(file_path)
@@ -159,29 +162,22 @@ styled_df = matchup_df.style\
     .background_gradient(cmap="Greens", subset=["Matchup Priority Score"])\
     .applymap(color_impact, subset=["Impact Direction"])
 
-st.markdown("### Matchup Priority Table")
-
-for i, row in matchup_df.iterrows():
-    col1, col2, col3 = st.columns([4, 2, 2])
-    with col1:
-        st.markdown(f"**{row['Variable']}**")
-    with col2:
-        st.markdown(f"{row['Matchup Priority Score']} pts")
-    with col3:
-        if st.button("View Detail", key=f"btn_{i}"):
-            stat_key = [k for k, v in readable_labels.items() if v == row["Variable"]][0]
-            st.session_state["selected_stat"] = stat_key
 
 st.dataframe(styled_df, use_container_width=True)
 
 # Stat breakdown selector
-if "selected_stat" not in st.session_state:
-    st.session_state["selected_stat"] = list(counterpart_map.keys())[0]
-selected_stat = st.selectbox(
+label_to_stat = {v: k for k, v in readable_labels.items()}
+readable_options = list(label_to_stat.keys())
+
+selected_label = st.selectbox(
     "Select a stat to view team performance tiers",
-    list(counterpart_map.keys()),
-    index=list(counterpart_map.keys()).index(st.session_state["selected_stat"])
+    readable_options,
+    index=readable_options.index(st.session_state["selected_stat"])
 )
+
+# Update session state and get internal stat key
+st.session_state["selected_stat"] = selected_label
+selected_stat = label_to_stat[selected_label]
 stat_counterpart = counterpart_map[selected_stat]
 
 # Function to get team stat averages and ranks by tier
