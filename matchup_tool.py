@@ -20,7 +20,7 @@ counterpart_map = {
 readable_labels = {
     'OREB': 'Offensive Rebounding',
     'DREB': 'Defensive Rebounding',
-    'FTRate': 'Free Throw Rate (Rim Attacking)',
+    'FTRate': 'Free Throw Rate',
     'OppFTRate': 'Opponent Free Throw Rate',
     'TOVRate': 'Turnovers',
     'OppTOVRate': 'Opponent Turnovers',
