@@ -69,7 +69,8 @@ scaled_power = statwise_scale(priority_power)
 
 # Sidebar explanation
 with st.sidebar:
-    st.header("How This Works")
+    try:
+        st.header("How This Works")
     st.markdown("""
     This tool identifies the most important factors for team success in a given matchup based on data from this season.
 
@@ -129,7 +130,10 @@ for stat, counterpart in counterpart_map.items():
 # Normalize the matchup scores
 matchup_series = pd.Series(matchup_scores)
 scaler = MinMaxScaler(feature_range=(1, 100))
-scaled = scaler.fit_transform(matchup_series.values.reshape(-1, 1)).flatten()
+if not matchup_series.empty:
+    scaled = scaler.fit_transform(matchup_series.values.reshape(-1, 1)).flatten()
+else:
+    scaled = [1] * len(matchup_series)
 
 matchup_df = pd.DataFrame({
     "Variable": matchup_series.index.map(readable_labels),
@@ -144,6 +148,18 @@ matchup_df.index.name = "Rank"
 styled_df = matchup_df.style.background_gradient(cmap="Greens", subset=["Matchup Priority Score"])
 
 st.dataframe(styled_df, use_container_width=True)
+
+# Show which teams are in the selected subset
+if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
+    subset_map = {
+        "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index.tolist(),
+        "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
+        "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
+    }
+    subset_teams = subset_map.get(opponent, [])
+    if subset_teams:
+        with st.expander(f"View teams in {opponent}"):
+    st.markdown(', '.join(subset_teams))
 
 # Show which teams are in the selected subset
 if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
