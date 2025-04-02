@@ -170,4 +170,4 @@ if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
     }
     subset_teams = subset_map[opponent]
     with st.expander(f"View teams in {opponent}"):
-    st.markdown(', '.join(subset_teams))
+        st.markdown(', '.join(subset_teams))
