@@ -71,28 +71,25 @@ scaled_power = statwise_scale(priority_power)
 with st.sidebar:
     try:
         st.header("How This Works")
-        st.markdown("""
-        This tool identifies the most important factors for team success in a given matchup based on data from this season.
+    st.markdown("""
+    This tool identifies the most important factors for team success in a given matchup based on data from this season.
 
-        #### 🧠 How Priority is Calculated:
-        For each stat (e.g., Defensive Rebounding), we calculate:
+    #### 🧠 How Priority is Calculated:
+    For each stat (e.g., Defensive Rebounding), we calculate:
 
-        - **Your Team**: Importance × 0.7 + Variability × 0.3  
-        - **Opponent**: Counterpart Importance × 0.7 + Variability × 0.3
+    - **Your Team**: Importance × 0.7 + Variability × 0.3  
+    - **Opponent**: Counterpart Importance × 0.7 + Variability × 0.3
 
-        These are then multiplied together to give a **Matchup Priority Score**, which is scaled from 1–100.
+    These are then multiplied together to give a **Matchup Priority Score**, which is scaled from 1–100.
 
-        #### 🎯 What This Means:
-        If Defensive Rebounding is a high priority, it means:
-        - Your team’s success is strongly tied to Defensive Rebounding.
-        - The opponent’s success is strongly tied to Offensive Rebounding.
-        - And either (or both) of those stats tend to fluctuate a lot game to game.
+    #### 🎯 What This Means:
+    If Defensive Rebounding is a high priority, it means:
+    - Your team’s success is strongly tied to Defensive Rebounding.
+    - The opponent’s success is strongly tied to Offensive Rebounding.
+    - And either (or both) of those stats tend to fluctuate a lot game to game.
 
-        These are the areas most worth emphasizing in preparation.
-        """)
-    except Exception as e:
-        st.error("Sidebar failed to load.")
-        st.exception(e)
+    These are the areas most worth emphasizing in preparation.
+    """)
 st.title("Matchup-Based Coaching Priorities")
 
 teams = sorted(scaled_weighted.index)
@@ -171,7 +168,6 @@ if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
         "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
         "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
     }
-    subset_teams = subset_map.get(opponent, [])
-    if subset_teams:
-        with st.expander(f"View teams in {opponent}"):
-            st.markdown(', '.join(subset_teams))
+    subset_teams = subset_map[opponent]
+    with st.expander(f"View teams in {opponent}"):
+    st.markdown(', '.join(subset_teams))
