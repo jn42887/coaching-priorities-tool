@@ -32,7 +32,7 @@ predictors = list(counterpart_map.keys())
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 
-importance_scores = {}
+importance_signed = {}
 for team, group in df.groupby("Team"):
     X = group[predictors].dropna()
     y = group.loc[X.index, 'NETRTG']
@@ -41,9 +41,9 @@ for team, group in df.groupby("Team"):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     model = LinearRegression().fit(X_scaled, y)
-    importance_scores[team] = pd.Series(abs(model.coef_), index=predictors)
+    importance_signed[team] = pd.Series(model.coef_, index=predictors)
 
-importance_df = pd.DataFrame(importance_scores).T.fillna(0)
+importance_df = pd.DataFrame(importance_signed).T.fillna(0)
 
 # Calculate variance per predictor per team
 variance_df = df.groupby("Team")[predictors].var().fillna(0)
@@ -134,9 +134,13 @@ if not matchup_series.empty:
 else:
     scaled = [1] * len(matchup_series)
 
+# Determine the direction of impact from original importance_df
+impact_sign = importance_df.loc[team].apply(lambda x: "Positive" if x > 0 else "Negative")
+
 matchup_df = pd.DataFrame({
     "Variable": matchup_series.index.map(readable_labels),
-    "Matchup Priority Score": scaled.round(0).astype(int)
+    "Matchup Priority Score": scaled.round(0).astype(int),
+    "Impact Direction": matchup_series.index.map(impact_sign)
 }).sort_values(by="Matchup Priority Score", ascending=False).reset_index(drop=True)
 
 # Add rank column from 1 to 8
@@ -144,12 +148,40 @@ matchup_df.index += 1
 matchup_df.index.name = "Rank"
 
 # Styled DataFrame for color gradient
-styled_df = matchup_df.style.background_gradient(cmap="Greens", subset=["Matchup Priority Score"])
+def color_impact(val):
+    if val == "Positive":
+        return "color: green"
+    elif val == "Negative":
+        return "color: red"
+    return ""
+
+styled_df = matchup_df.style\
+    .background_gradient(cmap="Greens", subset=["Matchup Priority Score"])\
+    .applymap(color_impact, subset=["Impact Direction"])
+
+st.markdown("### Matchup Priority Table")
+
+for i, row in matchup_df.iterrows():
+    col1, col2, col3 = st.columns([4, 2, 2])
+    with col1:
+        st.markdown(f"**{row['Variable']}**")
+    with col2:
+        st.markdown(f"{row['Matchup Priority Score']} pts")
+    with col3:
+        if st.button("View Detail", key=f"btn_{i}"):
+            stat_key = [k for k, v in readable_labels.items() if v == row["Variable"]][0]
+            st.session_state["selected_stat"] = stat_key
 
 st.dataframe(styled_df, use_container_width=True)
 
 # Stat breakdown selector
-selected_stat = st.selectbox("Select a stat to view team performance tiers", list(counterpart_map.keys()))
+if "selected_stat" not in st.session_state:
+    st.session_state["selected_stat"] = list(counterpart_map.keys())[0]
+selected_stat = st.selectbox(
+    "Select a stat to view team performance tiers",
+    list(counterpart_map.keys()),
+    index=list(counterpart_map.keys()).index(st.session_state["selected_stat"])
+)
 stat_counterpart = counterpart_map[selected_stat]
 
 # Function to get team stat averages and ranks by tier
@@ -185,7 +217,8 @@ def stat_by_tier(df, team, stat):
             return "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1)*(n % 10 < 4)*n % 10::4])
         rank_num = int(rank)
         rank_str = ordinal(rank_num)
-        records.append({"Game Tier": tier_name, "Value": round(avg_val, 2), "Rank": rank_str})
+        value_str = f"{avg_val * 100:.1f}%"
+        records.append({"Game Tier": tier_name, "Value": value_str, "Rank": rank_str})
     return pd.DataFrame(records)
 
 # Show side-by-side tables
@@ -227,13 +260,4 @@ if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
         with st.expander(f"View teams in {opponent}"):
             st.markdown(', '.join(subset_teams))
 
-# Show which teams are in the selected subset
-if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
-    subset_map = {
-        "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index.tolist(),
-        "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
-        "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
-    }
-    subset_teams = subset_map[opponent]
-    with st.expander(f"View teams in {opponent}"):
-        st.markdown(', '.join(subset_teams))
+
