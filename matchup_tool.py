@@ -69,8 +69,7 @@ scaled_power = statwise_scale(priority_power)
 
 # Sidebar explanation
 with st.sidebar:
-    try:
-        st.header("How This Works")
+    st.header("How This Works")
     st.markdown("""
     This tool identifies the most important factors for team success in a given matchup based on data from this season.
 
