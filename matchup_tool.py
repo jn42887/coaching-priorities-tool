@@ -180,7 +180,7 @@ def stat_by_tier(df, team, stat):
                 "Worst Games": group.iloc[2 * m // 3:]
             }[tier_name]
             tier_group.append(segment[stat].mean())
-        rank = pd.Series(tier_group).rank(ascending=False, method="min").loc[len(tier_group)] if tier_group else None
+        rank = pd.Series(tier_group + [avg_val]).rank(ascending=False, method="min").iloc[-1]
         def ordinal(n):
             return "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1)*(n % 10 < 4)*n % 10::4])
         rank_num = int(...)
