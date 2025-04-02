@@ -90,6 +90,9 @@ with st.sidebar:
 
     These are the areas most worth emphasizing in preparation.
     """)
+    except Exception as e:
+        st.error("Sidebar failed to load.")
+        st.exception(e)
 st.title("Matchup-Based Coaching Priorities")
 
 teams = sorted(scaled_weighted.index)
