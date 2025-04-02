@@ -248,7 +248,10 @@ with col2:
         subset_teams = subset_map[opponent]
         st.subheader(f"{opponent} Avg — {readable_labels.get(stat_counterpart, stat_counterpart)}")
         avg_df = pd.concat([stat_by_tier(df, opp, stat_counterpart) for opp in subset_teams])
+        # Strip % signs and convert to float
+        avg_df["Value"] = avg_df["Value"].str.replace('%', '').astype(float)
         tier_means = avg_df.groupby("Game Tier").agg({"Value": "mean"}).reset_index()
+        tier_means["Value"] = tier_means["Value"].apply(lambda x: f"{x:.1f}%" if selected_stat not in ["oQSQ", "dQSQ"] else f"{x:.1f}")
         tier_means["Rank"] = "–"
         st.dataframe(tier_means, use_container_width=True)
     else:
