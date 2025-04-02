@@ -194,7 +194,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader(f"{team} — {readable_labels.get(selected_stat, selected_stat)}")
     df_team_stat = stat_by_tier(df, team, selected_stat)
-    st.dataframe(df_team_stat, use_container_width=True)
+    st.dataframe(df_team_stat.set_index("Game Tier"), use_container_width=True)
 
 with col2:
     if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
@@ -213,7 +213,7 @@ with col2:
     else:
         st.subheader(f"{opponent} — {readable_labels.get(stat_counterpart, stat_counterpart)}")
         df_opp_stat = stat_by_tier(df, opponent, stat_counterpart)
-        st.dataframe(df_opp_stat, use_container_width=True)
+        st.dataframe(df_opp_stat.set_index("Game Tier"), use_container_width=True)
 
 # Show which teams are in the selected subset
 if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
