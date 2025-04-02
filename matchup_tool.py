@@ -158,13 +158,19 @@ for stat in neutral_stats:
     elif stat == "AvgDefPace":
         direction = "Faster" if importance > 0 else "Slower"
         label = "Opp Pace"
-    elif stat == "3PARate":
+    elif stat == "3PA Rate":
         direction = "More" if importance > 0 else "Less"
         label = "Threes"
-    elif stat == "Opp3PARate":
+    elif stat == "3PA Rate Allowed":
         direction = "More" if importance > 0 else "Less"
         label = "Opp Threes"
-    neutral_data.append({"Category": label, "Better": direction, "Importance": round(abs(importance) * 100)})
+    else:
+        label = readable_labels.get(stat, stat)
+    neutral_data.append({
+        "Category": label,
+        "Better": direction,
+        "Importance": round(abs(importance) * 100)
+    })
 
 neutral_df = pd.DataFrame(neutral_data)
 neutral_df = neutral_df.sort_values(by="Importance", ascending=False).reset_index(drop=True)
