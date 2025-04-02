@@ -69,7 +69,7 @@ scaled_power = statwise_scale(priority_power)
 st.title("Matchup-Based Coaching Priorities")
 
 teams = sorted(scaled_weighted.index)
-team = st.selectbox("Select Your Team", teams)
+team = st.selectbox("Select Your Team", teams, index=teams.index("CLE") if "CLE" in teams else 0)
 opponent_options = ["All Teams"] + [t for t in teams if t != team]
 opponent = st.selectbox("Select Opponent", opponent_options)
 
