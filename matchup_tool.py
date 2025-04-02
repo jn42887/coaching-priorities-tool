@@ -44,7 +44,23 @@ for team, group in df.groupby("Team"):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     model = LinearRegression().fit(X_scaled, y)
-    importance_signed[team] = pd.Series(model.coef_, index=predictors)
+    # Define stat polarity: +1 if more is good, -1 if less is good
+    direction_map = {
+        "oQSQ": 1,
+        "DREB": 1,
+        "FTRate": 1,
+        "OREB": 1,
+        "OppTOVRate": 1,
+        "dQSQ": -1,
+        "TOVRate": -1,
+    "OppFTRate": -1,
+    }
+
+    adjusted_coefs = {
+        stat: coef * direction_map[stat]
+        for stat, coef in zip(predictors, model.coef_)
+    }
+    importance_signed[team] = pd.Series(adjusted_coefs)
 
 importance_df = pd.DataFrame(importance_signed).T.fillna(0)
 
