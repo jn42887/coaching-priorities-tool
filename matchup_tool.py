@@ -42,7 +42,8 @@ predictors = list(counterpart_map.keys()) + neutral_stats
 # Regression-based importance
 importance_signed = {}
 for team, group in df.groupby("Team"):
-    X = group[predictors].dropna()
+    existing_predictors = [col for col in predictors if col in group.columns]
+    X = group[existing_predictors].dropna()
     y = group.loc[X.index, 'NETRTG']
     if len(X) < len(predictors):
         continue
@@ -50,14 +51,13 @@ for team, group in df.groupby("Team"):
     X_scaled = scaler.fit_transform(X)
     model = LinearRegression().fit(X_scaled, y)
 
-    adjusted_coefs = {}
-    for stat, coef in zip(predictors, model.coef_):
-        if stat in positive_stats:
-            adjusted_coefs[stat] = coef
-        elif stat in negative_stats:
-            adjusted_coefs[stat] = -coef
-        else:
-            adjusted_coefs[stat] = abs(coef)
+    direction_map = {stat: 1 for stat in positive_stats}
+    direction_map.update({stat: -1 for stat in negative_stats})
+    # neutral_stats default to 1 implicitly via .get(stat, 1)
+    adjusted_coefs = {
+    stat: coef * direction_map.get(stat, 1)  # default direction to 1 if missing
+        for stat, coef in zip(existing_predictors, model.coef_)
+    }
 
     importance_signed[team] = pd.Series(adjusted_coefs)
 
@@ -232,7 +232,7 @@ with col2:
         subset_teams = subset_map[opponent]
         st.subheader(f"{opponent} Avg — {readable_labels.get(stat_counterpart, stat_counterpart)}")
         avg_df = pd.concat([stat_by_tier(df, opp, stat_counterpart) for opp in subset_teams])
-        avg_df["Value"] = avg_df["Value"].str.replace('%', '').astype(float)
+        avg_df["Value"] = avg_df["Value"].astype(str).str.replace('%', '').astype(float)
         tier_means = avg_df.groupby("Game Tier").agg({"Value": "mean"}).reset_index()
         tier_means["Value"] = tier_means["Value"].apply(lambda x: f"{x:.1f}%" if selected_stat not in ["oQSQ", "dQSQ"] else f"{x:.1f}")
         tier_means["Rank"] = "–"
