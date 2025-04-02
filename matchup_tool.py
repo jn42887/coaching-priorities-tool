@@ -28,6 +28,8 @@ readable_labels = {
     'dQSQ': 'Defensive Shot Quality',
     '3PARate': '3PA Rate',
     'Opp3PARate': '3PA Rate Allowed',
+    '3PA Rate': '3PA Rate',
+    '3PA Rate Allowed': '3PA Rate Allowed',
     'AvgOffPace': 'Avg Off Pace',
     'AvgDefPace': 'Avg Def Pace'
 }
@@ -35,7 +37,7 @@ readable_labels = {
 # Key stat categories
 positive_stats = ["oQSQ", "DREB", "FTRate", "OREB", "OppTOVRate"]
 negative_stats = ["dQSQ", "TOVRate", "OppFTRate"]
-neutral_stats = ["3PARate", "Opp3PARate", "AvgOffPace", "AvgDefPace"]
+neutral_stats = ["3PA Rate", "3PA Rate Allowed", "AvgOffPace", "AvgDefPace"]
 
 predictors = list(counterpart_map.keys()) + neutral_stats
 
@@ -53,16 +55,14 @@ for team, group in df.groupby("Team"):
 
     direction_map = {stat: 1 for stat in positive_stats}
     direction_map.update({stat: -1 for stat in negative_stats})
-    # neutral_stats default to 1 implicitly via .get(stat, 1)
     adjusted_coefs = {
-    stat: coef * direction_map.get(stat, 1)  # default direction to 1 if missing
+        stat: coef * direction_map.get(stat, 1)
         for stat, coef in zip(existing_predictors, model.coef_)
     }
 
     importance_signed[team] = pd.Series(adjusted_coefs)
 
 importance_df = pd.DataFrame(importance_signed).T.fillna(0)
-# Only use columns that exist in df
 existing_predictors = [col for col in predictors if col in df.columns]
 variance_df = df.groupby("Team")[existing_predictors].var().fillna(0)
 predictors = existing_predictors
