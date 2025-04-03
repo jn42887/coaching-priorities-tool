@@ -14,7 +14,13 @@ counterpart_map = {
     'OREB': 'DREB', 'DREB': 'OREB',
     'FTRate': 'OppFTRate', 'OppFTRate': 'FTRate',
     'TOVRate': 'OppTOVRate', 'OppTOVRate': 'TOVRate',
-    'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ'
+    'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ',
+    
+    # Neutral stat flips
+    '3PA Rate': '3PA Rate Allowed',
+    '3PA Rate Allowed': '3PA Rate',
+    'AvgOffPace': 'AvgDefPace',
+    'AvgDefPace': 'AvgOffPace'
 }
 
 readable_labels = {
