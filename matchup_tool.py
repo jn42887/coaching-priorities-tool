@@ -16,12 +16,12 @@ counterpart_map = {
     'FTRate': 'OppFTRate', 'OppFTRate': 'FTRate',
     'TOVRate': 'OppTOVRate', 'OppTOVRate': 'TOVRate',
     'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ',
-    
-    # Neutral stat flips
-    "3PA Rate": "3PA Rate Allowed",
-    "3PA Rate Allowed": "3PA Rate",
-    "Avg Off Pace": "Avg Def Pace",
-    "Avg Def Pace": "Avg Off Pace"
+
+    # Neutral stat flips (updated to match stripped column names)
+    '3PARate': 'Opp3PARate',
+    'Opp3PARate': '3PARate',
+    'AvgOffPace': 'AvgDefPace',
+    'AvgDefPace': 'AvgOffPace'
 }
 
 readable_labels = {
@@ -35,8 +35,6 @@ readable_labels = {
     'dQSQ': 'Defensive Shot Quality',
     '3PARate': '3PA Rate',
     'Opp3PARate': '3PA Rate Allowed',
-    '3PA Rate': '3PA Rate',
-    '3PA Rate Allowed': '3PA Rate Allowed',
     'AvgOffPace': 'Avg Off Pace',
     'AvgDefPace': 'Avg Def Pace'
 }
@@ -44,7 +42,7 @@ readable_labels = {
 # Key stat categories
 positive_stats = ["oQSQ", "DREB", "FTRate", "OREB", "OppTOVRate"]
 negative_stats = ["dQSQ", "TOVRate", "OppFTRate"]
-neutral_stats = ["3PA Rate", "3PA Rate Allowed", "AvgOffPace", "AvgDefPace"]
+neutral_stats = ["3PARate", "Opp3PARate", "AvgOffPace", "AvgDefPace"]
 
 predictors = list(counterpart_map.keys()) + neutral_stats
 
@@ -94,12 +92,12 @@ with st.sidebar:
     st.header("How This Works")
     st.markdown("""
     This tool identifies the most important factors for team success based on this season's data.
-    
+
     **Priority Score = (Importance × 0.7 + Variability × 0.3)**
-    
+
     This is done for both your team and opponent (counterpart stat).
     Then they are multiplied together and scaled 1–100.
-    
+
     Neutral stats like Pace or 3PA Rate are treated separately.
     """)
 
@@ -154,6 +152,7 @@ matchup_df.index.name = "Rank"
 
 styled_df = matchup_df.style.background_gradient(cmap="Greens", subset=["Matchup Priority Score"])
 st.dataframe(styled_df, use_container_width=True)
+
 
 # Scale neutral stats’ importance across teams (absolute value)
 neutral_importance = importance_df[neutral_stats].abs()
