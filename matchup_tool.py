@@ -1,14 +1,13 @@
 import pandas as pd
 import streamlit as st
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import StandardScaler
 
 st.set_page_config(page_title="Matchup Priorities", layout="wide")
 
 file_path = "Four Factors by Team and Game.xlsx"
 df = pd.read_excel(file_path)
-df.columns = df.columns.str.strip()
+df.columns = df.columns.str.replace(" ", "")
 
 # Main stat maps
 counterpart_map = {
@@ -43,28 +42,21 @@ predictors = list(counterpart_map.keys()) + neutral_stats
 
 importance_signed = {}
 for team, group in df.groupby("Team"):
-    existing_predictors = [col for col in predictors if col in group.columns]
-    X = group[existing_predictors].dropna()
+    X = group[predictors].dropna()
     y = group.loc[X.index, 'NETRTG']
-    if len(X) < len(predictors):
-        continue
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     model = LinearRegression().fit(X_scaled, y)
-
     direction_map = {stat: 1 for stat in positive_stats}
     direction_map.update({stat: -1 for stat in negative_stats})
     adjusted_coefs = {
         stat: coef * direction_map.get(stat, 1)
-        for stat, coef in zip(existing_predictors, model.coef_)
+        for stat, coef in zip(predictors, model.coef_)
     }
-
     importance_signed[team] = pd.Series(adjusted_coefs)
 
 importance_df = pd.DataFrame(importance_signed).T.fillna(0)
-existing_predictors = [col for col in predictors if col in df.columns]
-variance_df = df.groupby("Team")[existing_predictors].var().fillna(0)
-predictors = existing_predictors
+variance_df = df.groupby("Team")[predictors].var().fillna(0)
 
 priority_product = importance_df * variance_df
 priority_weighted = 0.7 * importance_df + 0.3 * variance_df
@@ -85,12 +77,12 @@ with st.sidebar:
     st.header("How This Works")
     st.markdown("""
     This tool identifies the most important factors for team success based on this season's data.
-
+    
     **Priority Score = (Importance × 0.7 + Variability × 0.3)**
-
+    
     This is done for both your team and opponent (counterpart stat).
     Then they are multiplied together and scaled 1–100.
-
+    
     Neutral stats like Pace or 3PA Rate are treated separately.
     """)
 
@@ -112,8 +104,8 @@ else:
     selected_priority = scaled_power
 
 team_scores = selected_priority.loc[team]
-
 matchup_scores = {}
+
 for stat, counterpart in counterpart_map.items():
     if opponent == "All Teams":
         matchup_scores[stat] = team_scores[stat]
@@ -124,17 +116,14 @@ for stat, counterpart in counterpart_map.items():
             "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index,
         }
         opponents = subset_map[opponent]
-        avg_counterpart_score = selected_priority.loc[opponents, counterpart].mean()
+        avg_counterpart_score = selected_priority.loc[opponents][counterpart].mean()
         matchup_scores[stat] = team_scores[stat] * avg_counterpart_score
     else:
-        matchup_scores[stat] = team_scores[stat] * selected_priority.loc[opponent, counterpart]
+        matchup_scores[stat] = team_scores[stat] * selected_priority.loc[opponent][counterpart]
 
 matchup_series = pd.Series(matchup_scores)
 scaler = MinMaxScaler(feature_range=(1, 100))
-if not matchup_series.empty:
-    scaled = scaler.fit_transform(matchup_series.values.reshape(-1, 1)).flatten()
-else:
-    scaled = [1] * len(matchup_series)
+scaled = scaler.fit_transform(matchup_series.values.reshape(-1, 1)).flatten()
 
 matchup_df = pd.DataFrame({
     "Variable": matchup_series.index.map(readable_labels),
@@ -154,7 +143,6 @@ scaled_neutral_importance = pd.DataFrame(
     index=neutral_importance.index,
     columns=neutral_importance.columns
 )
-
 neutral_data = []
 for stat in neutral_stats:
     imp = scaled_neutral_importance.loc[team, stat]
@@ -178,9 +166,9 @@ for stat in neutral_stats:
 neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False).reset_index(drop=True)
 st.subheader("Neutral Stat Tendencies")
 styled_neutral_df = neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"])
-st.dataframe(styled_neutral_df, use_container_width=True)
+st.dataframe(styled_neutral_df.set_index("Category"), use_container_width=True)
 
-# Stat breakdowns
+# Performance tiers
 label_to_stat = {v: k for k, v in readable_labels.items()}
 readable_options = list(label_to_stat.keys())
 if "selected_stat" not in st.session_state:
@@ -247,7 +235,7 @@ with col2:
         tier_means = avg_df.groupby("Game Tier").agg({"Value": "mean"}).reset_index()
         tier_means["Value"] = tier_means["Value"].apply(lambda x: f"{x:.1f}%" if selected_stat not in ["oQSQ", "dQSQ", "AvgOffPace", "AvgDefPace"] else f"{x:.1f}")
         tier_means["Rank"] = "–"
-        st.dataframe(tier_means, use_container_width=True)
+        st.dataframe(tier_means.set_index("Game Tier"), use_container_width=True)
     else:
         st.subheader(f"{opponent} — {readable_labels.get(stat_counterpart, stat_counterpart)}")
         df_opp_stat = stat_by_tier(df, opponent, stat_counterpart)
