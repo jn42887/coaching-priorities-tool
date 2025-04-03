@@ -16,12 +16,8 @@ counterpart_map = {
     'FTRate': 'OppFTRate', 'OppFTRate': 'FTRate',
     'TOVRate': 'OppTOVRate', 'OppTOVRate': 'TOVRate',
     'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ',
-
-    # Neutral stat flips (updated to match stripped column names)
-    '3PARate': 'Opp3PARate',
-    'Opp3PARate': '3PARate',
-    'AvgOffPace': 'AvgDefPace',
-    'AvgDefPace': 'AvgOffPace'
+    '3PARate': 'Opp3PARate', 'Opp3PARate': '3PARate',
+    'AvgOffPace': 'AvgDefPace', 'AvgDefPace': 'AvgOffPace'
 }
 
 readable_labels = {
@@ -39,14 +35,12 @@ readable_labels = {
     'AvgDefPace': 'Avg Def Pace'
 }
 
-# Key stat categories
 positive_stats = ["oQSQ", "DREB", "FTRate", "OREB", "OppTOVRate"]
 negative_stats = ["dQSQ", "TOVRate", "OppFTRate"]
 neutral_stats = ["3PARate", "Opp3PARate", "AvgOffPace", "AvgDefPace"]
 
 predictors = list(counterpart_map.keys()) + neutral_stats
 
-# Regression-based importance
 importance_signed = {}
 for team, group in df.groupby("Team"):
     existing_predictors = [col for col in predictors if col in group.columns]
@@ -87,7 +81,6 @@ scaled_product = statwise_scale(priority_product)
 scaled_weighted = statwise_scale(priority_weighted)
 scaled_power = statwise_scale(priority_power)
 
-# UI
 with st.sidebar:
     st.header("How This Works")
     st.markdown("""
@@ -131,10 +124,10 @@ for stat, counterpart in counterpart_map.items():
             "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index,
         }
         opponents = subset_map[opponent]
-        avg_counterpart_score = selected_priority.loc[opponents][counterpart].mean()
+        avg_counterpart_score = selected_priority.loc[opponents, counterpart].mean()
         matchup_scores[stat] = team_scores[stat] * avg_counterpart_score
-    elif stat in team_scores and counterpart in selected_priority.loc[opponent]:
-        matchup_scores[stat] = team_scores[stat] * selected_priority.loc[opponent][counterpart]
+    else:
+        matchup_scores[stat] = team_scores[stat] * selected_priority.loc[opponent, counterpart]
 
 matchup_series = pd.Series(matchup_scores)
 scaler = MinMaxScaler(feature_range=(1, 100))
@@ -153,8 +146,7 @@ matchup_df.index.name = "Rank"
 styled_df = matchup_df.style.background_gradient(cmap="Greens", subset=["Matchup Priority Score"])
 st.dataframe(styled_df, use_container_width=True)
 
-
-# Scale neutral stats’ importance across teams (absolute value)
+# Neutral stat tendencies
 neutral_importance = importance_df[neutral_stats].abs()
 scaler = MinMaxScaler(feature_range=(1, 100))
 scaled_neutral_importance = pd.DataFrame(
@@ -163,7 +155,6 @@ scaled_neutral_importance = pd.DataFrame(
     columns=neutral_importance.columns
 )
 
-# Build the neutral stat table for the selected team
 neutral_data = []
 for stat in neutral_stats:
     imp = scaled_neutral_importance.loc[team, stat]
@@ -174,10 +165,10 @@ for stat in neutral_stats:
     elif stat == "AvgDefPace":
         direction = "Slower" if raw_imp > 0 else "Faster"
         label = "Opp Pace"
-    elif stat == "3PA Rate":
+    elif stat == "3PARate":
         direction = "More" if raw_imp > 0 else "Less"
         label = "Threes"
-    elif stat == "3PA Rate Allowed":
+    elif stat == "Opp3PARate":
         direction = "More" if raw_imp > 0 else "Less"
         label = "Opp Threes"
     else:
@@ -236,7 +227,6 @@ def stat_by_tier(df, team, stat):
         records.append({"Game Tier": tier_name, "Value": value_str, "Rank": rank_str})
     return pd.DataFrame(records)
 
-# Display tables
 col1, col2 = st.columns(2)
 with col1:
     st.subheader(f"{team} — {readable_labels.get(selected_stat, selected_stat)}")
