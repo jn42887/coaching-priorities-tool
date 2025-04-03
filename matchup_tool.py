@@ -7,7 +7,7 @@ st.set_page_config(page_title="Matchup Priorities", layout="wide")
 
 file_path = "Four Factors by Team and Game.xlsx"
 df = pd.read_excel(file_path)
-df.columns = df.columns.str.replace(" ", "")
+df.columns = df.columns.str.strip()
 
 # Main stat maps
 counterpart_map = {
@@ -15,7 +15,7 @@ counterpart_map = {
     'FTRate': 'OppFTRate', 'OppFTRate': 'FTRate',
     'TOVRate': 'OppTOVRate', 'OppTOVRate': 'TOVRate',
     'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ',
-    'ThreePARate': 'OppThreePARate', 'OppThreePARate': 'ThreePARate',
+    '3PA Rate': '3PA Rate Allowed', '3PA Rate Allowed': '3PA Rate',
     'AvgOffPace': 'AvgDefPace', 'AvgDefPace': 'AvgOffPace'
 }
 
@@ -28,18 +28,18 @@ readable_labels = {
     'OppTOVRate': 'Opponent Turnovers',
     'oQSQ': 'Offensive Shot Quality',
     'dQSQ': 'Defensive Shot Quality',
-    'ThreePARate': '3PA Rate',
-    'OppThreePARate': '3PA Rate Allowed',
+    '3PA Rate': '3PA Rate',
+    '3PA Rate Allowed': '3PA Rate Allowed',
     'AvgOffPace': 'Avg Off Pace',
     'AvgDefPace': 'Avg Def Pace'
 }
 
 positive_stats = ["oQSQ", "DREB", "FTRate", "OREB", "OppTOVRate"]
 negative_stats = ["dQSQ", "TOVRate", "OppFTRate"]
-neutral_stats = ["ThreePARate", "OppThreePARate", "AvgOffPace", "AvgDefPace"]
+neutral_stats = ["3PA Rate", "3PA Rate Allowed", "AvgOffPace", "AvgDefPace"]
+predictors = list(counterpart_map.keys()) + neutral_stats
 
-predictors = list(counterpart_map.keys())
-
+# Regression-based importance
 importance_signed = {}
 for team, group in df.groupby("Team"):
     X = group[predictors].dropna()
@@ -62,6 +62,7 @@ priority_product = importance_df * variance_df
 priority_weighted = 0.7 * importance_df + 0.3 * variance_df
 priority_power = (importance_df * variance_df) ** 1.5
 
+
 def statwise_scale(df):
     scaled_df = df.copy()
     for col in scaled_df.columns:
@@ -73,16 +74,17 @@ scaled_product = statwise_scale(priority_product)
 scaled_weighted = statwise_scale(priority_weighted)
 scaled_power = statwise_scale(priority_power)
 
+# UI
 with st.sidebar:
     st.header("How This Works")
     st.markdown("""
     This tool identifies the most important factors for team success based on this season's data.
-    
+
     **Priority Score = (Importance × 0.7 + Variability × 0.3)**
-    
+
     This is done for both your team and opponent (counterpart stat).
     Then they are multiplied together and scaled 1–100.
-    
+
     Neutral stats like Pace or 3PA Rate are treated separately.
     """)
 
@@ -153,10 +155,10 @@ for stat in neutral_stats:
     elif stat == "AvgDefPace":
         direction = "Slower" if raw_imp > 0 else "Faster"
         label = "Opp Pace"
-    elif stat == "ThreePARate":
+    elif stat == "3PA Rate":
         direction = "More" if raw_imp > 0 else "Less"
         label = "Threes"
-    elif stat == "OppThreePARate":
+    elif stat == "3PA Rate Allowed":
         direction = "More" if raw_imp > 0 else "Less"
         label = "Opp Threes"
     else:
@@ -167,76 +169,3 @@ neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=F
 st.subheader("Neutral Stat Tendencies")
 styled_neutral_df = neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"])
 st.dataframe(styled_neutral_df.set_index("Category"), use_container_width=True)
-
-# Tier breakdowns
-def stat_by_tier(df, team, stat):
-    team_df = df[df["Team"] == team].dropna(subset=["NETRTG", stat])
-    team_df = team_df.sort_values("NETRTG", ascending=False)
-    n = len(team_df)
-    if n < 3:
-        return pd.DataFrame(columns=["Game Tier", "Value", "Rank"])
-    tiers = {
-        "Best Games": team_df.iloc[:n // 3],
-        "Average Games": team_df.iloc[n // 3:2 * n // 3],
-        "Worst Games": team_df.iloc[2 * n // 3:]
-    }
-    records = []
-    for tier_name, tier_df in tiers.items():
-        avg_val = tier_df[stat].mean()
-        tier_group = []
-        for other_team in df["Team"].unique():
-            group = df[df["Team"] == other_team].sort_values("NETRTG", ascending=False)
-            m = len(group)
-            if m < 3:
-                continue
-            segment = {
-                "Best Games": group.iloc[:m // 3],
-                "Average Games": group.iloc[m // 3:2 * m // 3],
-                "Worst Games": group.iloc[2 * m // 3:]
-            }[tier_name]
-            tier_group.append(segment[stat].mean())
-        rank = pd.Series(tier_group + [avg_val]).rank(ascending=False, method="min").iloc[-1]
-        def ordinal(n): return "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1)*(n % 10 < 4)*n % 10::4])
-        rank_str = ordinal(int(rank))
-        if stat in ["oQSQ", "dQSQ", "AvgOffPace", "AvgDefPace"]:
-            value_str = f"{avg_val:.1f}"
-        else:
-            value_str = f"{avg_val * 100:.1f}%"
-        records.append({"Game Tier": tier_name, "Value": value_str, "Rank": rank_str})
-    return pd.DataFrame(records)
-
-label_to_stat = {v: k for k, v in readable_labels.items()}
-readable_options = list(label_to_stat.keys())
-if "selected_stat" not in st.session_state:
-    st.session_state["selected_stat"] = readable_options[0]
-
-selected_label = st.selectbox("Select a stat to view team performance tiers", readable_options, index=readable_options.index(st.session_state["selected_stat"]))
-st.session_state["selected_stat"] = selected_label
-selected_stat = label_to_stat[selected_label]
-stat_counterpart = counterpart_map.get(selected_stat, selected_stat)
-
-col1, col2 = st.columns(2)
-with col1:
-    st.subheader(f"{team} — {readable_labels.get(selected_stat, selected_stat)}")
-    df_team_stat = stat_by_tier(df, team, selected_stat)
-    st.dataframe(df_team_stat.set_index("Game Tier"), use_container_width=True)
-
-with col2:
-    if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
-        subset_map = {
-            "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index.tolist(),
-            "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
-            "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
-        }
-        subset_teams = subset_map[opponent]
-        st.subheader(f"{opponent} Avg — {readable_labels.get(stat_counterpart, stat_counterpart)}")
-        avg_df = pd.concat([stat_by_tier(df, opp, stat_counterpart) for opp in subset_teams])
-        avg_df["Value"] = avg_df["Value"].astype(str).str.replace('%', '').astype(float)
-        tier_means = avg_df.groupby("Game Tier").agg({"Value": "mean"}).reset_index()
-        tier_means["Value"] = tier_means["Value"].apply(lambda x: f"{x:.1f}%" if selected_stat not in ["oQSQ", "dQSQ", "AvgOffPace", "AvgDefPace"] else f"{x:.1f}")
-        tier_means["Rank"] = "–"
-        st.dataframe(tier_means.set_index("Game Tier"), use_container_width=True)
-    else:
-        st.subheader(f"{opponent} — {readable_labels.get(stat_counterpart, stat_counterpart)}")
-        df_opp_stat = stat_by_tier(df, opponent, stat_counterpart)
-        st.dataframe(df_opp_stat.set_index("Game Tier"), use_container_width=True)
