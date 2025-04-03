@@ -163,10 +163,10 @@ for stat in neutral_stats:
     imp = scaled_neutral_importance.loc[team, stat]
     raw_imp = importance_df.loc[team, stat]
     if stat == "AvgOffPace":
-        direction = "Faster" if raw_imp > 0 else "Slower"
+        direction = "Slower" if raw_imp > 0 else "Faster"
         label = "Pace"
     elif stat == "AvgDefPace":
-        direction = "Faster" if raw_imp > 0 else "Slower"
+        direction = "Slower" if raw_imp > 0 else "Faster"
         label = "Opp Pace"
     elif stat == "3PA Rate":
         direction = "More" if raw_imp > 0 else "Less"
@@ -223,7 +223,7 @@ def stat_by_tier(df, team, stat):
         rank = pd.Series(tier_group + [avg_val]).rank(ascending=False, method="min").iloc[-1]
         def ordinal(n): return "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1)*(n % 10 < 4)*n % 10::4])
         rank_str = ordinal(int(rank))
-        if stat in ["oQSQ", "dQSQ"]:
+        if stat in ["oQSQ", "dQSQ", "AvgOffPace", "AvgDefPace"]:
             value_str = f"{avg_val:.1f}"
         else:
             value_str = f"{avg_val * 100:.1f}%"
@@ -249,7 +249,7 @@ with col2:
         avg_df = pd.concat([stat_by_tier(df, opp, stat_counterpart) for opp in subset_teams])
         avg_df["Value"] = avg_df["Value"].astype(str).str.replace('%', '').astype(float)
         tier_means = avg_df.groupby("Game Tier").agg({"Value": "mean"}).reset_index()
-        tier_means["Value"] = tier_means["Value"].apply(lambda x: f"{x:.1f}%" if selected_stat not in ["oQSQ", "dQSQ"] else f"{x:.1f}")
+        tier_means["Value"] = tier_means["Value"].apply(lambda x: f"{x:.1f}%" if selected_stat not in ["oQSQ", "dQSQ", "AvgOffPace", "AvgDefPace"] else f"{x:.1f}")
         tier_means["Rank"] = "–"
         st.dataframe(tier_means, use_container_width=True)
     else:
