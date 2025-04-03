@@ -8,6 +8,7 @@ st.set_page_config(page_title="Matchup Priorities", layout="wide")
 
 file_path = "Four Factors by Team and Game.xlsx"
 df = pd.read_excel(file_path)
+df.columns = df.columns.str.strip()
 
 # Main stat maps
 counterpart_map = {
@@ -17,10 +18,10 @@ counterpart_map = {
     'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ',
     
     # Neutral stat flips
-    '3PA Rate': '3PA Rate Allowed',
-    '3PA Rate Allowed': '3PA Rate',
-    'AvgOffPace': 'AvgDefPace',
-    'AvgDefPace': 'AvgOffPace'
+    "3PA Rate": "3PA Rate Allowed",
+    "3PA Rate Allowed": "3PA Rate",
+    "Avg Off Pace": "Avg Def Pace",
+    "Avg Def Pace": "Avg Off Pace"
 }
 
 readable_labels = {
