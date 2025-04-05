@@ -167,8 +167,9 @@ for stat in neutral_stats:
 
 neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False).reset_index(drop=True)
 st.subheader("Neutral Stat Tendencies")
+neutral_df = neutral_df.set_index("Category")
 styled_neutral_df = neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"])
-st.dataframe(styled_neutral_df.set_index("Category"), use_container_width=True)
+st.dataframe(styled_neutral_df, use_container_width=True)
 
 # Performance tiers
 label_to_stat = {v: k for k, v in readable_labels.items()}
