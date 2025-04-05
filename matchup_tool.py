@@ -244,4 +244,10 @@ with col2:
         avg_df = pd.concat([stat_by_tier(df, opp, stat_counterpart) for opp in subset_teams])
         avg_df["Value"] = avg_df["Value"].astype(str).str.replace('%', '').astype(float)
         tier_means = avg_df.groupby("Game Tier").agg({"Value": "mean"}).reset_index()
-        tier_means["Value"] = tier_means["Value"].
+        tier_means["Value"] = tier_means["Value"].apply(lambda x: f"{x:.1f}%" if selected_stat not in ["oQSQ", "dQSQ", "AvgOffPace", "AvgDefPace"] else f"{x:.1f}")
+        tier_means["Rank"] = "–"
+        st.dataframe(tier_means.set_index("Game Tier"), use_container_width=True)
+    else:
+        st.subheader(f"{opponent} — {readable_labels.get(stat_counterpart, stat_counterpart)}")
+        df_opp_stat = stat_by_tier(df, opponent, stat_counterpart)
+        st.dataframe(df_opp_stat.set_index("Game Tier"), use_container_width=True)
