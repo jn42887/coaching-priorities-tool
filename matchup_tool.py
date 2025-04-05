@@ -7,15 +7,15 @@ st.set_page_config(page_title="Matchup Priorities", layout="wide")
 
 file_path = "Four Factors by Team and Game.xlsx"
 df = pd.read_excel(file_path)
-df.columns = df.columns.str.replace(" ", "")  # Strip spaces from column names
+df.columns = df.columns.str.replace(" ", "")  # Remove all whitespace from column names
 
-# Main stat maps (updated for column names)
+# Main stat maps
 counterpart_map = {
     'OREB': 'DREB', 'DREB': 'OREB',
     'FTRate': 'OppFTRate', 'OppFTRate': 'FTRate',
     'TOVRate': 'OppTOVRate', 'OppTOVRate': 'TOVRate',
     'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ',
-    '3PARate': 'Opp3PARate', 'Opp3PARate': '3PARate',
+    '3PARate': '3PARateAllowed', '3PARateAllowed': '3PARate',
     'AvgOffPace': 'AvgDefPace', 'AvgDefPace': 'AvgOffPace'
 }
 
@@ -30,20 +30,18 @@ readable_labels = {
     'oQSQ': 'Offensive Shot Quality',
     'dQSQ': 'Defensive Shot Quality',
     '3PARate': '3PA Rate',
-    'Opp3PARate': '3PA Rate Allowed',
+    '3PARateAllowed': '3PA Rate Allowed',
     'AvgOffPace': 'Avg Off Pace',
     'AvgDefPace': 'Avg Def Pace'
 }
 
-# Key stat categories
+# Stat categories
 positive_stats = ["oQSQ", "DREB", "FTRate", "OREB", "OppTOVRate"]
 negative_stats = ["dQSQ", "TOVRate", "OppFTRate"]
-neutral_stats = ["3PARate", "Opp3PARate", "AvgOffPace", "AvgDefPace"]
+neutral_stats = ["3PARate", "3PARateAllowed", "AvgOffPace", "AvgDefPace"]
+predictors = list(counterpart_map.keys())
 
-# Predictors for regression model
-predictors = list(counterpart_map.keys()) + neutral_stats
-
-# Regression-based importance calculation
+# Regression-based importance
 importance_signed = {}
 for team, group in df.groupby("Team"):
     X = group[predictors].dropna()
@@ -66,7 +64,6 @@ priority_product = importance_df * variance_df
 priority_weighted = 0.7 * importance_df + 0.3 * variance_df
 priority_power = (importance_df * variance_df) ** 1.5
 
-# Scale for the stats
 def statwise_scale(df):
     scaled_df = df.copy()
     for col in scaled_df.columns:
@@ -78,7 +75,6 @@ scaled_product = statwise_scale(priority_product)
 scaled_weighted = statwise_scale(priority_weighted)
 scaled_power = statwise_scale(priority_power)
 
-# UI settings and instructions
 with st.sidebar:
     st.header("How This Works")
     st.markdown("""
@@ -112,7 +108,6 @@ else:
 team_scores = selected_priority.loc[team]
 matchup_scores = {}
 
-# Matchup score calculation
 for stat, counterpart in counterpart_map.items():
     if opponent == "All Teams":
         matchup_scores[stat] = team_scores[stat]
@@ -128,7 +123,6 @@ for stat, counterpart in counterpart_map.items():
     else:
         matchup_scores[stat] = team_scores[stat] * selected_priority.loc[opponent][counterpart]
 
-# Convert the matchup scores to a DataFrame
 matchup_series = pd.Series(matchup_scores)
 scaler = MinMaxScaler(feature_range=(1, 100))
 scaled = scaler.fit_transform(matchup_series.values.reshape(-1, 1)).flatten()
@@ -140,7 +134,6 @@ matchup_df = pd.DataFrame({
 matchup_df.index += 1
 matchup_df.index.name = "Rank"
 
-# Display matchup priority scores
 styled_df = matchup_df.style.background_gradient(cmap="Greens", subset=["Matchup Priority Score"])
 st.dataframe(styled_df, use_container_width=True)
 
@@ -165,20 +158,19 @@ for stat in neutral_stats:
     elif stat == "3PARate":
         direction = "More" if raw_imp > 0 else "Less"
         label = "Threes"
-    elif stat == "Opp3PARate":
+    elif stat == "3PARateAllowed":
         direction = "More" if raw_imp > 0 else "Less"
         label = "Opp Threes"
     else:
         label = readable_labels.get(stat, stat)
     neutral_data.append({"Category": label, "Better": direction, "Importance": round(imp)})
 
-# Create DataFrame for neutral stats
 neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False).reset_index(drop=True)
 st.subheader("Neutral Stat Tendencies")
 styled_neutral_df = neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"])
 st.dataframe(styled_neutral_df.set_index("Category"), use_container_width=True)
 
-# Performance tiers breakdown
+# Performance tiers
 label_to_stat = {v: k for k, v in readable_labels.items()}
 readable_options = list(label_to_stat.keys())
 if "selected_stat" not in st.session_state:
@@ -225,7 +217,6 @@ def stat_by_tier(df, team, stat):
         records.append({"Game Tier": tier_name, "Value": value_str, "Rank": rank_str})
     return pd.DataFrame(records)
 
-# Display performance tier breakdown
 col1, col2 = st.columns(2)
 with col1:
     st.subheader(f"{team} — {readable_labels.get(selected_stat, selected_stat)}")
