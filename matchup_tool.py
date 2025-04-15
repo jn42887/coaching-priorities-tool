@@ -37,7 +37,7 @@ readable_labels = {
 positive_stats = ["oQSQ", "DREB", "FTRate", "OREB", "OppTOVRate"]
 negative_stats = ["dQSQ", "TOVRate", "OppFTRate"]
 neutral_stats = ["3PARate", "3PARateAllowed", "AvgOffPace", "AvgDefPace"]
-predictors = list(counterpart_map.keys())
+predictors = list(counterpart_map.keys()) + neutral_stats
 
 # Classification for color scheme
 stat_type_map = {
