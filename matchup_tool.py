@@ -134,7 +134,16 @@ matchup_df = pd.DataFrame({
 matchup_df.index += 1
 matchup_df.index.name = "Rank"
 
-styled_df = matchup_df.style.background_gradient(cmap="Greens", subset=["Matchup Priority Score"])
+# Determine if stat is offense or defense for color-coding
+def color_by_type(row):
+    stat = [k for k, v in readable_labels.items() if v == row["Variable"]][0]
+    if stat in ["OREB", "FTRate", "TOVRate", "oQSQ", "3PARate", "AvgOffPace"]:
+        return ["background-color: #c7f0c7" if col == "Matchup Priority Score" else "" for col in row.index]  # green
+    elif stat in ["DREB", "OppFTRate", "OppTOVRate", "dQSQ", "3PARateAllowed", "AvgDefPace"]:
+        return ["background-color: #c7d7f0" if col == "Matchup Priority Score" else "" for col in row.index]  # blue
+    return [""] * len(row)
+
+styled_df = matchup_df.style.apply(color_by_type, axis=1)
 st.dataframe(styled_df, use_container_width=True)
 
 # Neutral stat tendencies
