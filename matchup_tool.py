@@ -10,11 +10,14 @@ df = pd.read_excel(file_path)
 df.columns = df.columns.str.replace(" ", "")  # Remove all spaces
 
 # Main stat maps (for 8 core stats only)
+# Main stat maps (including neutral stat counterparts)
 counterpart_map = {
     'OREB': 'DREB', 'DREB': 'OREB',
     'FTRate': 'OppFTRate', 'OppFTRate': 'FTRate',
     'TOVRate': 'OppTOVRate', 'OppTOVRate': 'TOVRate',
-    'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ'
+    'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ',
+    '3PARate': '3PARateAllowed', '3PARateAllowed': '3PARate',
+    'AvgOffPace': 'AvgDefPace', 'AvgDefPace': 'AvgOffPace'
 }
 
 # Labels
