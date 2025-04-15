@@ -80,6 +80,14 @@ scaled_product = statwise_scale(priority_product)
 scaled_weighted = statwise_scale(priority_weighted)
 scaled_power = statwise_scale(priority_power)
 
+# Scaled neutral importance matrix
+neutral_importance = importance_df[neutral_stats].abs()
+scaled_neutral_importance = pd.DataFrame(
+    MinMaxScaler((1, 100)).fit_transform(neutral_importance),
+    columns=neutral_importance.columns,
+    index=neutral_importance.index
+)
+
 # UI
 with st.sidebar:
     st.header("How This Works")
@@ -93,7 +101,7 @@ with st.sidebar:
 
     Neutral stats like Pace or 3PA Rate are shown separately.
 
-    🟩 Green = Offense | 🟦 Blue = Defense
+    🟩 Green = Offense | 🟦 Blue = Defense | 🟪 Purple = Stylistic Tendencies
     """)
 
 st.title("Matchup-Based Coaching Priorities")
@@ -158,13 +166,25 @@ styled_scores = styled_scores.hide(subset=["Type"], axis="columns")
 st.subheader("Priority of Four Factors")
 st.dataframe(styled_scores, use_container_width=True)
 
-# Neutral stats section
+# Matchup-specific neutral stat priority
+team_vals = scaled_neutral_importance.loc[team, neutral_stats]
+if opponent == "All Teams":
+    opponent_vals = pd.Series([1] * len(neutral_stats), index=neutral_stats)
+elif opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
+    subset_map = {
+        "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index.tolist(),
+        "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
+        "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
+    }
+    opponent_vals = scaled_neutral_importance.loc[subset_map[opponent], neutral_stats].mean()
+else:
+    opponent_vals = scaled_neutral_importance.loc[opponent, neutral_stats]
+
+neutral_matchup = team_vals * opponent_vals
+rescaled = (neutral_matchup.values - neutral_matchup.min()) / (neutral_matchup.max() - neutral_matchup.min()) * 99 + 1
+rescaled = pd.Series(rescaled, index=neutral_stats)
+
 neutral_data = []
-neutral_importance = importance_df[neutral_stats].abs()
-scaled_neutral_importance = pd.DataFrame(
-    MinMaxScaler((1, 100)).fit_transform(neutral_importance),
-    columns=neutral_importance.columns, index=neutral_importance.index
-)
 for stat in neutral_stats:
     raw_imp = importance_df.loc[team, stat]
     label = readable_labels[stat]
@@ -175,14 +195,12 @@ for stat in neutral_stats:
     neutral_data.append({
         "Category": label,
         "Better": direction,
-        "Importance": round(scaled_neutral_importance.loc[team, stat])
+        "Importance": round(rescaled[stat])
     })
 
-neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False)
+neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False).set_index("Category")
 st.subheader("Priority of Stylistic Tendencies")
-neutral_df = neutral_df.set_index("Category")
-styled_neutral = neutral_df.style.background_gradient(cmap="Purples", subset=["Importance"])
-st.dataframe(styled_neutral, use_container_width=True)
+st.dataframe(neutral_df.style.background_gradient(cmap="Purples", subset=["Importance"]), use_container_width=True)
 
 # Tier breakdown: performance across best/mid/worst games
 label_to_stat = {v: k for k, v in readable_labels.items()}
