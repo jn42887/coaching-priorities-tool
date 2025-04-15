@@ -1,4 +1,4 @@
-mport pandas as pd
+import pandas as pd
 import streamlit as st
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.linear_model import LinearRegression
