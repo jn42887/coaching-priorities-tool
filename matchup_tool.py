@@ -155,7 +155,7 @@ def highlight_type(row):
 styled_scores = matchup_df.style.apply(highlight_type, axis=1)
 styled_scores = styled_scores.hide(subset=["Type"], axis="columns")
 
-st.subheader("Matchup Priority Factors")
+st.subheader("Priority of Four Factors")
 st.dataframe(styled_scores, use_container_width=True)
 
 # Neutral stats section
@@ -179,7 +179,7 @@ for stat in neutral_stats:
     })
 
 neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False)
-st.subheader("Neutral Stat Tendencies")
+st.subheader("Priority of Stylistic Tendencies")
 neutral_df = neutral_df.set_index("Category")
-styled_neutral = neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"])
+styled_neutral = neutral_df.style.background_gradient(cmap="Purples", subset=["Importance"])
 st.dataframe(styled_neutral, use_container_width=True)
