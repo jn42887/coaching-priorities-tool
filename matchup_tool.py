@@ -144,6 +144,7 @@ def color_by_type(row):
     return [""] * len(row)
 
 styled_df = matchup_df.style.apply(color_by_type, axis=1)
+st.markdown("🟩 <span style='color:#000;'>**Green**</span> = Offense &nbsp;&nbsp;&nbsp; 🟦 <span style='color:#000;'>**Blue**</span> = Defense", unsafe_allow_html=True)
 st.dataframe(styled_df, use_container_width=True)
 
 # Neutral stat tendencies
