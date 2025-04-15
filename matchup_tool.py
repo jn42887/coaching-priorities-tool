@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.linear_model import LinearRegression
+import matplotlib.colors as mcolors
 
 st.set_page_config(page_title="Matchup Priorities", layout="wide")
 
@@ -9,14 +10,12 @@ file_path = "Four Factors by Team and Game.xlsx"
 df = pd.read_excel(file_path)
 df.columns = df.columns.str.replace(" ", "")
 
-# Stat categorization
+# Define mappings and categories
 counterpart_map = {
     'OREB': 'DREB', 'DREB': 'OREB',
     'FTRate': 'OppFTRate', 'OppFTRate': 'FTRate',
     'TOVRate': 'OppTOVRate', 'OppTOVRate': 'TOVRate',
-    'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ',
-    '3PARate': '3PARateAllowed', '3PARateAllowed': '3PARate',
-    'AvgOffPace': 'AvgDefPace', 'AvgDefPace': 'AvgOffPace'
+    'oQSQ': 'dQSQ', 'dQSQ': 'oQSQ'
 }
 
 readable_labels = {
@@ -37,11 +36,12 @@ readable_labels = {
 positive_stats = ["oQSQ", "DREB", "FTRate", "OREB", "OppTOVRate"]
 negative_stats = ["dQSQ", "TOVRate", "OppFTRate"]
 neutral_stats = ["3PARate", "3PARateAllowed", "AvgOffPace", "AvgDefPace"]
-offensive_stats = ["OREB", "FTRate", "TOVRate", "oQSQ", "3PARate"]
-defensive_stats = ["DREB", "OppFTRate", "OppTOVRate", "dQSQ", "3PARateAllowed", "AvgDefPace"]
+offensive_stats = ["oQSQ", "OREB", "FTRate", "TOVRate", "3PARate"]
+defensive_stats = ["dQSQ", "DREB", "OppFTRate", "OppTOVRate", "3PARateAllowed", "AvgDefPace"]
 
 predictors = list(counterpart_map.keys())
 
+# Calculate regression importance
 importance_signed = {}
 for team, group in df.groupby("Team"):
     X = group[predictors].dropna()
@@ -67,7 +67,7 @@ priority_power = (importance_df * variance_df) ** 1.5
 def statwise_scale(df):
     scaled_df = df.copy()
     for col in scaled_df.columns:
-        scaler = MinMaxScaler(feature_range=(1, 100))
+        scaler = MinMaxScaler((1, 100))
         scaled_df[col] = scaler.fit_transform(scaled_df[[col]])
     return scaled_df
 
@@ -75,18 +75,20 @@ scaled_product = statwise_scale(priority_product)
 scaled_weighted = statwise_scale(priority_weighted)
 scaled_power = statwise_scale(priority_power)
 
+# UI layout
 with st.sidebar:
     st.header("How This Works")
     st.markdown("""
-    This tool identifies the most important factors for team success based on this season's data.
-
     **Priority Score = (Importance × 0.7 + Variability × 0.3)**
 
-    Neutral stats like Pace or 3PA Rate are treated separately.
+    This is done for both your team and opponent (counterpart stat).
+    Then they are multiplied together and scaled 1–100.
+
+    Green = offensive stat. Blue = defensive stat.
+    Neutral stats like Pace and 3PA Rate are handled separately below.
     """)
 
 st.title("Matchup-Based Coaching Priorities")
-st.caption(":green[Green] = offensive stat, :blue[Blue] = defensive stat")
 
 teams = sorted(scaled_weighted.index)
 team = st.selectbox("Select Your Team", teams, index=teams.index("CLE") if "CLE" in teams else 0)
@@ -122,32 +124,39 @@ for stat, counterpart in counterpart_map.items():
         matchup_scores[stat] = team_scores[stat] * selected_priority.loc[opponent][counterpart]
 
 matchup_series = pd.Series(matchup_scores)
-scaler = MinMaxScaler(feature_range=(1, 100))
+scaler = MinMaxScaler((1, 100))
 scaled = scaler.fit_transform(matchup_series.values.reshape(-1, 1)).flatten()
 
 matchup_df = pd.DataFrame({
-    "Stat": matchup_series.index,
-    "Label": matchup_series.index.map(readable_labels),
+    "Variable": matchup_series.index,
     "Matchup Priority Score": scaled.round(0).astype(int)
 })
-matchup_df = matchup_df[~matchup_df["Stat"].isin(neutral_stats)].copy()
-matchup_df = matchup_df.sort_values(by="Matchup Priority Score", ascending=False).reset_index(drop=True)
-matchup_df.index += 1
-matchup_df.index.name = "Rank"
+matchup_df["Type"] = matchup_df["Variable"].apply(lambda x: "Offense" if x in offensive_stats else "Defense")
+matchup_df["Variable"] = matchup_df["Variable"].map(readable_labels)
 
-styled = matchup_df.style
-for stat in matchup_df["Stat"]:
-    if stat in offensive_stats:
-        styled = styled.background_gradient(cmap="Greens", subset=pd.IndexSlice[:, ["Matchup Priority Score"]])
-    elif stat in defensive_stats:
-        styled = styled.background_gradient(cmap="Blues", subset=pd.IndexSlice[:, ["Matchup Priority Score"]])
+# Apply dual color formatting
+def highlight_color(val, type_):
+    if type_ == "Offense":
+        return f"background-color: {mcolors.to_hex(mcolors.LinearSegmentedColormap.from_list('', ['white','green'])(val/100))}"
+    else:
+        return f"background-color: {mcolors.to_hex(mcolors.LinearSegmentedColormap.from_list('', ['white','dodgerblue'])(val/100))}"
 
+def style_matchup(df):
+    styled = df.copy()
+    return pd.DataFrame(
+        [[highlight_color(val, type_) for val, type_ in zip(row[1:], row[2:])]
+         for row in styled.itertuples()],
+        index=styled.index,
+        columns=["Matchup Priority Score"]
+    )
+
+styled_scores = matchup_df.style.apply(lambda x: style_matchup(matchup_df).loc[x.name], axis=1)
 st.subheader("Matchup Priority Factors")
-st.dataframe(styled.hide(axis=1, subset=["Stat"]), use_container_width=True)
+st.dataframe(styled_scores.hide_columns("Type"), use_container_width=True)
 
 # Neutral stat tendencies
 neutral_importance = importance_df[neutral_stats].abs()
-scaler = MinMaxScaler(feature_range=(1, 100))
+scaler = MinMaxScaler((1, 100))
 scaled_neutral_importance = pd.DataFrame(
     scaler.fit_transform(neutral_importance),
     index=neutral_importance.index,
@@ -175,4 +184,4 @@ for stat in neutral_stats:
 
 neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False).reset_index(drop=True)
 st.subheader("Neutral Stat Tendencies")
-st.dataframe(neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"]).set_index("Category"), use_container_width=True)
+st.dataframe(neutral_df.set_index("Category").style.background_gradient(cmap="Greens", subset=["Importance"]), use_container_width=True)
