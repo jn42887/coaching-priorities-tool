@@ -9,8 +9,7 @@ file_path = "Four Factors by Team and Game.xlsx"
 df = pd.read_excel(file_path)
 df.columns = df.columns.str.replace(" ", "")  # Remove all spaces
 
-# Main stat maps (for 8 core stats only)
-# Main stat maps (including neutral stat counterparts)
+# Full stat map (8 core + 4 neutral)
 counterpart_map = {
     'OREB': 'DREB', 'DREB': 'OREB',
     'FTRate': 'OppFTRate', 'OppFTRate': 'FTRate',
@@ -36,75 +35,49 @@ readable_labels = {
     'AvgDefPace': 'Avg Def Pace'
 }
 
-# Stat classifications
 positive_stats = ["oQSQ", "DREB", "FTRate", "OREB", "OppTOVRate"]
 negative_stats = ["dQSQ", "TOVRate", "OppFTRate"]
 neutral_stats = ["3PARate", "3PARateAllowed", "AvgOffPace", "AvgDefPace"]
-predictors = list(counterpart_map.keys()) + neutral_stats
+predictors = list(counterpart_map.keys())
 
-# Classification for color scheme
 stat_type_map = {
     'OREB': 'Offense', 'FTRate': 'Offense', 'TOVRate': 'Offense', 'oQSQ': 'Offense',
     'DREB': 'Defense', 'OppFTRate': 'Defense', 'OppTOVRate': 'Defense', 'dQSQ': 'Defense',
     '3PARate': 'Offense', '3PARateAllowed': 'Defense', 'AvgOffPace': 'Offense', 'AvgDefPace': 'Defense'
 }
 
-# Regression-based importance
+# Importance calculation
 importance_signed = {}
 for team, group in df.groupby("Team"):
-    X = group[predictors].dropna()
+    X = group[predictors + neutral_stats].dropna()
     y = group.loc[X.index, 'NETRTG']
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X_scaled = StandardScaler().fit_transform(X)
     model = LinearRegression().fit(X_scaled, y)
     direction_map = {stat: 1 for stat in positive_stats}
     direction_map.update({stat: -1 for stat in negative_stats})
     adjusted_coefs = {
         stat: coef * direction_map.get(stat, 1)
-        for stat, coef in zip(predictors, model.coef_)
+        for stat, coef in zip(predictors + neutral_stats, model.coef_)
     }
     importance_signed[team] = pd.Series(adjusted_coefs)
 
 importance_df = pd.DataFrame(importance_signed).T.fillna(0)
-variance_df = df.groupby("Team")[predictors].var().fillna(0)
+variance_df = df.groupby("Team")[predictors + neutral_stats].var().fillna(0)
 
-priority_product = importance_df * variance_df
 priority_weighted = 0.7 * importance_df + 0.3 * variance_df
-priority_power = (importance_df * variance_df) ** 1.5
-
-def statwise_scale(df):
-    scaled_df = df.copy()
-    for col in scaled_df.columns:
-        scaler = MinMaxScaler(feature_range=(1, 100))
-        scaled_df[col] = scaler.fit_transform(scaled_df[[col]])
-    return scaled_df
-
-scaled_product = statwise_scale(priority_product)
-scaled_weighted = statwise_scale(priority_weighted)
-scaled_power = statwise_scale(priority_power)
-
-# Scaled neutral importance matrix
-neutral_importance = importance_df[neutral_stats].abs()
-scaled_neutral_importance = pd.DataFrame(
-    MinMaxScaler((1, 100)).fit_transform(neutral_importance),
-    columns=neutral_importance.columns,
-    index=neutral_importance.index
-)
+scaled_weighted = priority_weighted.copy()
+for col in scaled_weighted.columns:
+    scaled_weighted[col] = MinMaxScaler((1, 100)).fit_transform(scaled_weighted[[col]])
 
 # UI
 with st.sidebar:
     st.header("How This Works")
     st.markdown("""
-    This tool identifies the most important factors for team success based on this season's data.
-    
-    **Priority Score = (Importance × 0.7 + Variability × 0.3)**
+    **Priority Score = (Importance × 0.7 + Variability × 0.3)**  
+    All stats (including pace and 3PA rate) are included.  
+    Scores are multiplied against opponent tendencies.
 
-    This is done for both your team and opponent (counterpart stat).
-    Then they are multiplied together and scaled 1–100.
-
-    Neutral stats like Pace or 3PA Rate are shown separately.
-
-    🟩 Green = Offense | 🟦 Blue = Defense | 🟪 Purple = Stylistic Tendencies
+    🟩 Green = Offense | 🟦 Blue = Defense | 🟪 Purple = Stylistic
     """)
 
 st.title("Matchup-Based Coaching Priorities")
@@ -114,105 +87,60 @@ team = st.selectbox("Select Your Team", teams, index=teams.index("CLE") if "CLE"
 opponent_options = ["All Teams", "Top 5 Teams", "Top 10 Teams", "Top 16 Teams"] + [t for t in teams if t != team]
 opponent = st.selectbox("Select Opponent", opponent_options)
 
-with st.expander("Advanced Settings: Priority Method", expanded=False):
-    method = st.radio("Choose Method for Calculating Priority Scores", ["Product (x)", "Weighted Average", "Powered Product^1.5"], index=1)
-
-if method == "Product (x)":
-    selected_priority = scaled_product
-elif method == "Weighted Average":
-    selected_priority = scaled_weighted
-else:
-    selected_priority = scaled_power
-
-team_scores = selected_priority.loc[team]
+team_scores = scaled_weighted.loc[team]
 matchup_scores = {}
 for stat, counterpart in counterpart_map.items():
     if opponent == "All Teams":
         matchup_scores[stat] = team_scores[stat]
     elif opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
-        subset_map = {
-            "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index,
-            "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index,
-            "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index,
-        }
-        opponents = subset_map[opponent]
-        avg_counterpart_score = selected_priority.loc[opponents][counterpart].mean()
-        matchup_scores[stat] = team_scores[stat] * avg_counterpart_score
+        subset = df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(
+            int(opponent.split()[1])).index
+        matchup_scores[stat] = team_scores[stat] * scaled_weighted.loc[subset][counterpart].mean()
     else:
-        matchup_scores[stat] = team_scores[stat] * selected_priority.loc[opponent][counterpart]
+        matchup_scores[stat] = team_scores[stat] * scaled_weighted.loc[opponent][counterpart]
 
-# Only the 8 main stats go in this table
-main_stats = list(counterpart_map.keys())
-matchup_series = pd.Series({k: v for k, v in matchup_scores.items() if k in main_stats})
-scaler = MinMaxScaler(feature_range=(1, 100))
-scaled = scaler.fit_transform(matchup_series.values.reshape(-1, 1)).flatten()
-
+# Four Factors table
+core_stats = [s for s in predictors if s not in neutral_stats]
+matchup_series = pd.Series({k: v for k, v in matchup_scores.items() if k in core_stats})
 matchup_df = pd.DataFrame({
     "Variable": matchup_series.index.map(readable_labels),
-    "Matchup Priority Score": scaled.round(0).astype(int),
+    "Matchup Priority Score": MinMaxScaler((1, 100)).fit_transform(matchup_series.values.reshape(-1, 1)).flatten().round(0).astype(int),
     "Type": [stat_type_map[stat] for stat in matchup_series.index]
 }).sort_values(by="Matchup Priority Score", ascending=False).reset_index(drop=True)
 matchup_df.index += 1
 matchup_df.index.name = "Rank"
 
-def highlight_type(row):
-    if row["Type"] == "Offense":
-        return ["background-color: #c7f0c7" if col == "Matchup Priority Score" else "" for col in row.index]
-    elif row["Type"] == "Defense":
-        return ["background-color: #c7d7f0" if col == "Matchup Priority Score" else "" for col in row.index]
-    return [""] * len(row)
+def highlight(row):
+    color = {"Offense": "#c7f0c7", "Defense": "#c7d7f0", "Stylistic": "#e1c7f0"}[row["Type"]]
+    return ["background-color: {}".format(color) if col == "Matchup Priority Score" else "" for col in row.index]
 
-# Highlight rows using 'Type', then hide that column
-styled_scores = matchup_df.style.apply(highlight_type, axis=1)
-styled_scores = styled_scores.hide(subset=["Type"], axis="columns")
-
+styled_scores = matchup_df.style.apply(highlight, axis=1).hide(subset=["Type"], axis="columns")
 st.subheader("Priority of Four Factors")
 st.dataframe(styled_scores, use_container_width=True)
 
-# Matchup-specific neutral stat priority
-team_vals = scaled_neutral_importance.loc[team, neutral_stats]
-if opponent == "All Teams":
-    opponent_vals = pd.Series([1] * len(neutral_stats), index=neutral_stats)
-elif opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
-    subset_map = {
-        "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index.tolist(),
-        "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
-        "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
-    }
-    opponent_vals = scaled_neutral_importance.loc[subset_map[opponent], neutral_stats].mean()
-else:
-    opponent_vals = scaled_neutral_importance.loc[opponent, neutral_stats]
+# Stylistic (neutral) section
+neutral_series = pd.Series({k: v for k, v in matchup_scores.items() if k in neutral_stats})
+neutral_scaled = MinMaxScaler((1, 100)).fit_transform(neutral_series.values.reshape(-1, 1)).flatten()
+neutral_df = pd.DataFrame({
+    "Category": [readable_labels[stat] for stat in neutral_series.index],
+    "Better": ["Slower" if "Pace" in stat and importance_df.loc[team, stat] > 0 else
+               "Faster" if "Pace" in stat else
+               "More" if importance_df.loc[team, stat] > 0 else "Less"
+               for stat in neutral_series.index],
+    "Importance": neutral_scaled.round(0).astype(int),
+    "Type": [stat_type_map[stat] for stat in neutral_series.index]
+}).sort_values(by="Importance", ascending=False).set_index("Category")
 
-neutral_matchup = team_vals * opponent_vals
-rescaled = (neutral_matchup.values - neutral_matchup.min()) / (neutral_matchup.max() - neutral_matchup.min()) * 99 + 1
-rescaled = pd.Series(rescaled, index=neutral_stats)
+def highlight_neutral(row):
+    color = {"Offense": "#c7f0c7", "Defense": "#c7d7f0"}[row["Type"]]
+    return ["background-color: {}".format(color) if col == "Importance" else "" for col in row.index]
 
-neutral_data = []
-for stat in neutral_stats:
-    raw_imp = importance_df.loc[team, stat]
-    label = readable_labels[stat]
-    if "Pace" in stat:
-        direction = "Slower" if raw_imp > 0 else "Faster"
-    else:
-        direction = "More" if raw_imp > 0 else "Less"
-    neutral_data.append({
-        "Category": label,
-        "Better": direction,
-        "Importance": round(rescaled[stat])
-    })
-
-neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False).set_index("Category")
 st.subheader("Priority of Stylistic Tendencies")
-st.dataframe(neutral_df.style.background_gradient(cmap="Purples", subset=["Importance"]), use_container_width=True)
+st.dataframe(neutral_df.style.apply(highlight_neutral, axis=1).hide(["Type"], axis="columns"), use_container_width=True)
 
-# Tier breakdown: performance across best/mid/worst games
+# Tier tables
 label_to_stat = {v: k for k, v in readable_labels.items()}
-readable_options = list(label_to_stat.keys())
-if "selected_stat" not in st.session_state:
-    st.session_state["selected_stat"] = readable_options[0]
-
-selected_label = st.selectbox("Select a stat to view performance tiers", readable_options, index=readable_options.index(st.session_state["selected_stat"]))
-st.session_state["selected_stat"] = selected_label
+selected_label = st.selectbox("Select a stat to view performance tiers", list(label_to_stat.keys()))
 selected_stat = label_to_stat[selected_label]
 stat_counterpart = counterpart_map.get(selected_stat, selected_stat)
 
@@ -243,37 +171,27 @@ def stat_by_tier(df, team, stat):
             }[tier_name]
             tier_group.append(segment[stat].mean())
         rank = pd.Series(tier_group + [avg_val]).rank(ascending=False, method="min").iloc[-1]
-        def ordinal(n): return "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1)*(n % 10 < 4)*n % 10::4])
-        rank_str = ordinal(int(rank))
-        if stat in ["oQSQ", "dQSQ", "AvgOffPace", "AvgDefPace"]:
-            value_str = f"{avg_val:.1f}"
-        else:
-            value_str = f"{avg_val * 100:.1f}%"
-        records.append({"Game Tier": tier_name, "Value": value_str, "Rank": rank_str})
+        def ordinal(n): return "%d%s" % (n, "tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
+        value_str = f"{avg_val:.1f}" if "Pace" in stat or "QSQ" in stat else f"{avg_val*100:.1f}%"
+        records.append({"Game Tier": tier_name, "Value": value_str, "Rank": ordinal(int(rank))})
     return pd.DataFrame(records)
 
 col1, col2 = st.columns(2)
 with col1:
-    st.subheader(f"{team} — {readable_labels.get(selected_stat, selected_stat)}")
-    df_team_stat = stat_by_tier(df, team, selected_stat)
-    st.dataframe(df_team_stat.set_index("Game Tier").style.hide(axis="index"), use_container_width=True)
+    st.subheader(f"{team} — {readable_labels.get(selected_stat)}")
+    st.dataframe(stat_by_tier(df, team, selected_stat).set_index("Game Tier").style.hide(axis="index"), use_container_width=True)
 
 with col2:
     if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
-        subset_map = {
-            "Top 5 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(5).index.tolist(),
-            "Top 10 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(10).index.tolist(),
-            "Top 16 Teams": df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(16).index.tolist(),
-        }
-        subset_teams = subset_map[opponent]
-        st.subheader(f"{opponent} Avg — {readable_labels.get(stat_counterpart, stat_counterpart)}")
-        avg_df = pd.concat([stat_by_tier(df, opp, stat_counterpart) for opp in subset_teams])
-        avg_df["Value"] = avg_df["Value"].astype(str).str.replace('%', '').astype(float)
-        tier_means = avg_df.groupby("Game Tier").agg({"Value": "mean"}).reset_index()
-        tier_means["Value"] = tier_means["Value"].apply(lambda x: f"{x:.1f}%" if selected_stat not in ["oQSQ", "dQSQ", "AvgOffPace", "AvgDefPace"] else f"{x:.1f}")
-        tier_means["Rank"] = "–"
-        st.dataframe(tier_means.set_index("Game Tier").style.hide(axis="index"), use_container_width=True)
+        subset = df.groupby("Team")["NETRTG"].mean().sort_values(ascending=False).head(
+            int(opponent.split()[1])).index
+        st.subheader(f"{opponent} Avg — {readable_labels.get(stat_counterpart)}")
+        combined = pd.concat([stat_by_tier(df, t, stat_counterpart) for t in subset])
+        combined["Value"] = combined["Value"].astype(str).str.replace('%', '').astype(float)
+        mean_tiers = combined.groupby("Game Tier")["Value"].mean().reset_index()
+        mean_tiers["Value"] = mean_tiers["Value"].apply(lambda x: f"{x:.1f}%" if "Pace" not in selected_stat and "QSQ" not in selected_stat else f"{x:.1f}")
+        mean_tiers["Rank"] = "–"
+        st.dataframe(mean_tiers.set_index("Game Tier").style.hide(axis="index"), use_container_width=True)
     else:
-        st.subheader(f"{opponent} — {readable_labels.get(stat_counterpart, stat_counterpart)}")
-        df_opp_stat = stat_by_tier(df, opponent, stat_counterpart)
-        st.dataframe(df_opp_stat.set_index("Game Tier").style.hide(axis="index"), use_container_width=True)
+        st.subheader(f"{opponent} — {readable_labels.get(stat_counterpart)}")
+        st.dataframe(stat_by_tier(df, opponent, stat_counterpart).set_index("Game Tier").style.hide(axis="index"), use_container_width=True)
