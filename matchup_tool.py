@@ -180,4 +180,6 @@ for stat in neutral_stats:
 
 neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False)
 st.subheader("Neutral Stat Tendencies")
-st.dataframe(neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"]).set_index("Category"), use_container_width=True)
+neutral_df = neutral_df.set_index("Category")
+styled_neutral = neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"])
+st.dataframe(styled_neutral, use_container_width=True)
