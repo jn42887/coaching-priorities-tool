@@ -176,7 +176,7 @@ for stat in neutral_stats:
     neutral_data.append({"Category": label, "Better": direction, "Importance": round(imp)})
 
 neutral_df = pd.DataFrame(neutral_data).sort_values(by="Importance", ascending=False).reset_index(drop=True)
-st.subheader("Neutral Stat Tendencies")
+st.subheader("Stylistic Tendencies")
 neutral_df = neutral_df.set_index("Category")
 styled_neutral_df = neutral_df.style.background_gradient(cmap="Greens", subset=["Importance"])
 st.dataframe(styled_neutral_df, use_container_width=True)
@@ -232,7 +232,11 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader(f"{team} — {readable_labels.get(selected_stat, selected_stat)}")
     df_team_stat = stat_by_tier(df, team, selected_stat)
-    st.dataframe(df_team_stat.set_index("Game Tier"), use_container_width=True)
+    styled_team = df_team_stat.set_index("Game Tier").style.set_table_styles(
+        [{'selector': 'th', 'props': [('min-width', '120px')]},
+         {'selector': 'td', 'props': [('min-width', '100px')]}]
+    )
+    st.dataframe(styled_team, use_container_width=True)
 
 with col2:
     if opponent in ["Top 5 Teams", "Top 10 Teams", "Top 16 Teams"]:
@@ -248,8 +252,16 @@ with col2:
         tier_means = avg_df.groupby("Game Tier").agg({"Value": "mean"}).reset_index()
         tier_means["Value"] = tier_means["Value"].apply(lambda x: f"{x:.1f}%" if selected_stat not in ["oQSQ", "dQSQ", "AvgOffPace", "AvgDefPace"] else f"{x:.1f}")
         tier_means["Rank"] = "–"
-        st.dataframe(tier_means.set_index("Game Tier"), use_container_width=True)
+        styled_tier_means = tier_means.set_index("Game Tier").style.set_table_styles(
+            [{'selector': 'th', 'props': [('min-width', '120px')]},
+             {'selector': 'td', 'props': [('min-width', '100px')]}]
+        )
+        st.dataframe(styled_tier_means, use_container_width=True)
     else:
         st.subheader(f"{opponent} — {readable_labels.get(stat_counterpart, stat_counterpart)}")
         df_opp_stat = stat_by_tier(df, opponent, stat_counterpart)
-        st.dataframe(df_opp_stat.set_index("Game Tier"), use_container_width=True)
+        styled_opp = df_opp_stat.set_index("Game Tier").style.set_table_styles(
+            [{'selector': 'th', 'props': [('min-width', '120px')]},
+             {'selector': 'td', 'props': [('min-width', '100px')]}]
+        )
+        st.dataframe(styled_opp, use_container_width=True)
