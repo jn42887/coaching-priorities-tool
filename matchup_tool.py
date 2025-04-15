@@ -151,10 +151,12 @@ def highlight_type(row):
         return ["background-color: #c7d7f0" if col == "Matchup Priority Score" else "" for col in row.index]
     return [""] * len(row)
 
+# Highlight rows using 'Type', then hide that column
 styled_scores = matchup_df.style.apply(highlight_type, axis=1)
-styled_scores_data = matchup_df.drop(columns="Type")
+styled_scores = styled_scores.hide(subset=["Type"], axis="columns")
+
 st.subheader("Matchup Priority Factors")
-st.dataframe(styled_scores_data.style.apply(highlight_type, axis=1), use_container_width=True)
+st.dataframe(styled_scores, use_container_width=True)
 
 # Neutral stats section
 neutral_data = []
